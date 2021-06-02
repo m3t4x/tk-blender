@@ -20,7 +20,7 @@ import inspect
 
 import bpy
 from bpy.types import Header, Menu, Panel, Operator
-from bpy.app.handlers import load_factory_startup_post, persistent
+from bpy.app.handlers import load_factory_startup_post, persistent, load_post
 
 import site
 
@@ -261,7 +261,6 @@ def startup(dummy):
     bpy.ops.screen.qt_event_loop()
     boostrap()
 
-
 @persistent
 def error_importing_pyside2(*args):
     bpy.ops.shotgun.logger(level="ERROR", message=PYSIDE2_MISSING_MESSAGE)
@@ -283,7 +282,11 @@ def register():
     bpy.utils.register_class(TOPBAR_MT_editor_menus)
     bpy.utils.register_class(TOPBAR_MT_shotgun)
 
-    load_factory_startup_post.append(startup)
+    #not sure the reason for using the app handler load_factory_startup_post
+    #load_post seems to work as expected vs the shipped functionality
+    #load_factory_startup_post.append(startup)
+    load_post.append(startup)
+
 
 
 def unregister():
