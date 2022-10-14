@@ -309,7 +309,9 @@ def _find_scene_animation_range():
         start, end = 1, 1
     else:
         start, end = keys[0], keys[-1]
-
+        start = int(start)
+        end = int(end)
+        
     return start, end
 
 
