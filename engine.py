@@ -47,7 +47,7 @@ SHOW_COMP_DLG = "SGTK_COMPATIBILITY_DIALOG_SHOWN"
 # this is the absolute minimum Blender version for the engine to work. Actually
 # the one the engine was developed originally under, so change it at your
 # own risk if needed.
-MIN_COMPATIBILITY_VERSION = 2.8
+MIN_COMPATIBILITY_VERSION = 3.0
 
 
 # Although the engine has logging already, this logger is needed for logging
@@ -318,6 +318,8 @@ class BlenderEngine(Engine):
 
         self.init_qt_app()
 
+        self.check_version_compatibility()
+
         """
         Runs after the engine is set up but before any apps have been
         initialized.
@@ -331,19 +333,10 @@ class BlenderEngine(Engine):
         QtCore.QTextCodec.setCodecForCStrings(utf8)
         self.logger.debug("set utf-8 codec for widget text")
 
-    def init_engine(self):
+    def check_version_compatibility(self):
         """
-        Initializes the Blender engine.
+        Checks version compatibility against the Minimal compatible versions
         """
-        self.logger.debug("%s: Initializing...", self)
-
-        # check that we are running a supported OS
-        if not any([is_windows(), is_linux(), is_macos()]):
-            raise tank.TankError(
-                "The current platform is not supported!"
-                " Supported platforms "
-                "are Mac, Linux 64 and Windows 64."
-            )
 
         # check that we are running an ok version of Blender
         build_version = bpy.app.version
@@ -372,6 +365,7 @@ class BlenderEngine(Engine):
             )
 
             # determine if we should show the compatibility warning dialog:
+            #os.environ[SHOW_COMP_DLG] = "1"
             show_warning_dlg = self.has_ui and SHOW_COMP_DLG not in os.environ
 
             if show_warning_dlg:
@@ -390,21 +384,35 @@ class BlenderEngine(Engine):
             # always log the warning to the script editor:
             self.logger.warning(msg)
 
-            # In the case of Windows, we have the possibility of locking up if
-            # we allow the PySide shim to import QtWebEngineWidgets.
-            # We can stop that happening here by setting the following
-            # environment variable.
+    def init_engine(self):
+        """
+        Initializes the Blender engine.
+        """
+        self.logger.debug("%s: Initializing...", self)
 
-            # Note that prior PyQt5 v5.12 this module existed, after that it has
-            # been separated and would not cause any issues.
-            # https://www.riverbankcomputing.com/software/pyqtwebengine/intro
-            if is_windows():
-                self.logger.debug(
-                    "This application on Windows can deadlock if QtWebEngineWidgets "
-                    "is imported. Setting "
-                    "SHOTGUN_SKIP_QTWEBENGINEWIDGETS_IMPORT=1..."
-                )
-                os.environ["SHOTGUN_SKIP_QTWEBENGINEWIDGETS_IMPORT"] = "1"
+        # check that we are running a supported OS
+        if not any([is_windows(), is_linux(), is_macos()]):
+            raise tank.TankError(
+                "The current platform is not supported!"
+                " Supported platforms "
+                "are Mac, Linux 64 and Windows 64."
+            )
+
+        # In the case of Windows, we have the possibility of locking up if
+        # we allow the PySide shim to import QtWebEngineWidgets.
+        # We can stop that happening here by setting the following
+        # environment variable.
+
+        # Note that prior PyQt5 v5.12 this module existed, after that it has
+        # been separated and would not cause any issues.
+        # https://www.riverbankcomputing.com/software/pyqtwebengine/intro
+        if is_windows():
+            self.logger.debug(
+                "This application on Windows can deadlock if QtWebEngineWidgets "
+                "is imported. Setting "
+                "SHOTGUN_SKIP_QTWEBENGINEWIDGETS_IMPORT=1..."
+            )
+            os.environ["SHOTGUN_SKIP_QTWEBENGINEWIDGETS_IMPORT"] = "1"
 
         # default menu name is Shotgun but this can be overriden
         # in the configuration to be Sgtk in case of conflicts
@@ -496,6 +504,8 @@ class BlenderEngine(Engine):
         """
         Called when all apps have initialized
         """
+
+
         tank.platform.engine.set_current_engine(self)
 
         # create the shotgun menu
