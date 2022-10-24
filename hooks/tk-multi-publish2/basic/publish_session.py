@@ -16,6 +16,7 @@ from contextlib import contextmanager
 
 import bpy
 import sgtk
+import json
 from sgtk.util.filesystem import ensure_folder_exists
 
 
@@ -293,6 +294,16 @@ class BlenderSessionPublishPlugin(HookBaseClass):
         # step. NOTE: this path could change prior to the publish phase.
         item.properties["path"] = path
 
+        #validate that the current blender file has specified a link/append collection
+        if bpy.context.scene.sgtk_link_collection == None:
+            error_msg = (
+                "Validation failed because there is no link collection "
+                "Assigned. Please check your Shotgrid Publish Properties "
+                "located on the Scene Properties Panel and try again."
+            )
+            self.logger.error(error_msg)
+            raise Exception(error_msg)
+
         # run the base class validation
         return super(BlenderSessionPublishPlugin, self).validate(settings, item)
 
@@ -310,6 +321,8 @@ class BlenderSessionPublishPlugin(HookBaseClass):
         # are appropriate for current os, no double separators, etc.
         path = sgtk.util.ShotgunPath.normalize(_session_path())
 
+        #write shotgun properties to textblock in blender file as strings
+        _write_properties_to_json()
         # ensure the session is saved
         _save_session(path)
 
@@ -338,9 +351,52 @@ class BlenderSessionPublishPlugin(HookBaseClass):
         # do the base class finalization
         super(BlenderSessionPublishPlugin, self).finalize(settings, item)
 
+        #remove publish_textblock
+        textblocks = bpy.data.texts
+        publish_textblock = textblocks.get('sgtk_publish_data')
+        if publish_textblock:
+            textblocks.remove(publish_textblock)
+
         # bump the session file to the next version
         self._save_to_next_version(item.properties["path"], item, _save_session)
 
+
+
+def _write_properties_to_json():
+    """
+    Collect the custom properties in their current state and write the values
+    to a textblock for publishing.
+    """
+
+    sgtk_link_list = []
+    for scene in bpy.data.scenes:
+        tmp = scene.get("sgtk_link_collection").name
+        sgtk_link_list.append(tmp)
+
+    #remove duplicates
+    sgtk_link_list = list(set(sgtk_link_list))
+
+    # data to write to the json file
+    sgtk_properties_data = {
+      'sgtk_link_collection': sgtk_link_list,
+    }
+
+    # dump string to json
+    sgtk_json = json.dumps(sgtk_properties_data, sort_keys=True, indent=2)
+
+    # check to see if publish data exsists in the file already and if so clear it
+    # if not then create a new textblock
+    textblocks = bpy.data.texts
+    publish_textblock = textblocks.get('sgtk_publish_data')
+    if publish_textblock:
+        publish_textblock.clear()
+    else:
+        publish_textblock = textblocks.new('sgtk_publish_data')
+
+    #write the json to the textblock
+    publish_textblock.from_string(sgtk_json)
+
+    return
 
 def _blender_find_additional_session_dependencies():
     """
