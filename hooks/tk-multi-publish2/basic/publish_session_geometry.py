@@ -119,7 +119,7 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
         accept() method. Strings can contain glob patters such as *, for example
         ["blender.*", "file.blender"]
         """
-        return ["blender.session.geometry"]
+        return ["blender.primary_abc_collection.geometry"]
 
     def accept(self, settings, item):
         """
@@ -252,8 +252,73 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
         if "version" in work_fields:
             item.properties["publish_version"] = work_fields["version"]
 
+        # check that collection to be publish does not contain collections
+        if len(item.properties['collection'].children) > 0:
+            error_msg = (
+                "Validation failed because there is no support at this time "
+                "for publish collections to contain child collections "
+            )
+            self.logger.error(error_msg)
+            raise Exception(error_msg)
+
         # run the base class validation
         return super(BlenderSessionGeometryPublishPlugin, self).validate(settings, item)
+
+    def select_collection(self, collection):
+        """
+        selects the contents of the collection for export
+        """
+
+        #get the viewlayer object of the collection
+        vl_collection = bpy.context.view_layer.layer_collection.children[collection.name]
+
+        #Deselect Everything
+        bpy.ops.object.select_all(action='DESELECT')
+
+        #if the collection is currently exluded then unexclude it
+        if vl_collection.exclude == True:
+            vl_collection.exclude = False
+
+        #if the collection is currently hidden fromt he viewport unhide it
+        if collection.hide_select == True:
+            collection.hide_select = False
+
+        #select all the objects in the collection
+        for obj in collection.all_objects:
+            obj.hide_select = False
+            obj.select_set(True)
+
+        return
+
+    def abc_publish(self, collection, publish_path, start_frame, end_frame):
+        """
+        runs the publish for all alembic output
+        """
+        try:
+            #select the contents of the collection to run on
+            self.select_collection(collection)
+
+            context = get_view3d_operator_context()
+
+            bpy.ops.wm.alembic_export(
+                context,
+                filepath=publish_path,
+                selected=True,
+                visible_objects_only=False,
+                uvs=True,
+                vcolors=True,
+                face_sets=True,
+                start=start_frame,
+                end=end_frame,
+            )
+
+            #Deselect Everything
+            bpy.ops.object.select_all(action='DESELECT')
+
+        except Exception as e:
+            error_msg = "Failed to export Geometry: %s" % e
+            self.logger.error(error_msg)
+            raise Exception(error_msg)
 
     def publish(self, settings, item):
         """
@@ -268,30 +333,21 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
         # get the path to create and publish
         publish_path = item.properties["path"]
 
+        #get the publish type
+        publish_type = item.properties["publish_type"]
+
+        #get the publish collection
+        publish_collection = item.properties["collection"]
+
         # ensure the publish folder exists:
         publish_folder = os.path.dirname(publish_path)
         self.parent.ensure_folder_exists(publish_folder)
 
         start_frame, end_frame = _find_scene_animation_range()
 
-        try:
-            context = get_view3d_operator_context()
+        if publish_type == "Alembic Cache":
+            self.abc_publish(publish_collection, publish_path, start_frame, end_frame)
 
-            bpy.ops.wm.alembic_export(
-                context,
-                filepath=publish_path,
-                selected=False,
-                visible_objects_only=True,
-                uvs=True,
-                face_sets=True,
-                start=start_frame,
-                end=end_frame,
-            )
-
-        except Exception as e:
-            error_msg = "Failed to export Geometry: %s" % e
-            self.logger.error(error_msg)
-            raise Exception(error_msg)
 
         # Now that the path has been generated, hand it off to the
         super(BlenderSessionGeometryPublishPlugin, self).publish(settings, item)
@@ -311,7 +367,7 @@ def _find_scene_animation_range():
         start, end = keys[0], keys[-1]
         start = int(start)
         end = int(end)
-        
+
     return start, end
 
 

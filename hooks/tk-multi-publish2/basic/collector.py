@@ -82,22 +82,30 @@ class BlenderSessionCollector(HookBaseClass):
 
         # create an item representing the current blender session
         item = self.collect_current_blender_session(settings, parent_item)
-        self._collect_session_geometry(item)
 
-    def _collect_session_geometry(self, parent_item):
-        """
-        Creates items for session geometry to be exported.
-        :param parent_item: Parent Item instance
-        """
+        # Check to see if a primary alembic has been set
+        if bpy.context.scene.sgtk_abc_collection != None:
+            self._collect_primary_abc_collection(item)
 
+
+    def _collect_primary_abc_collection(self, parent_item):
+        """
+        Creates a an item based on the the sgtk_abc_collection in the
+        Shotgrid Publish Properties being filled.
+        """
         geo_item = parent_item.create_item(
-            "blender.session.geometry", "Geometry", "All Session Geometry"
+            "blender.primary_abc_collection.geometry", "Geometry", "Collection Geometry"
         )
 
         # get the icon path to display for this item
         icon_path = os.path.join(self.disk_location, os.pardir, "icons", "geometry.png")
 
         geo_item.set_icon_from_path(icon_path)
+
+        #set additional item properties
+        geo_item.properties['publish_type'] = "Alembic Cache"
+        geo_item.properties['collection'] = bpy.context.scene.sgtk_abc_collection
+
 
     def collect_current_blender_session(self, settings, parent_item):
         """

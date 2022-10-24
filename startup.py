@@ -83,9 +83,13 @@ class BlenderLauncher(SoftwareLauncher):
         # by appending it to the env PYTHONPATH.
         scripts_path = os.path.join(self.disk_location, "resources", "scripts")
 
-        startup_path = os.path.join(scripts_path, "startup", "Shotgun_menu.py")
-
-        args += "-P " + startup_path
+        # Allow multiple scripts to be passed to blender on startup.
+        startup_scripts = [ "Shotgun_menu.py",
+                            "Shotgrid_extend.py"
+                            ]
+        for sscript in startup_scripts:
+            startup_path = os.path.join(scripts_path, "startup", sscript)
+            args += "-P %s " % (startup_path)
 
         required_env["BLENDER_USER_SCRIPTS"] = scripts_path
 

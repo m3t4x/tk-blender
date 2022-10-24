@@ -20,6 +20,7 @@ from contextlib import contextmanager
 
 import bpy
 import sgtk
+import json
 from sgtk.errors import TankError
 
 
@@ -298,6 +299,43 @@ class BlenderActions(HookBaseClass):
     ###########################################################################
     # helper methods which can be subclassed in custom hooks to fine tune the
     # behaviour of things
+    def _get_sgtk_collection_list(self, path):
+
+        if not os.path.exists(path):
+            raise TankError("File not found on disk - '%s'" % path)
+
+        # get the text blocks from the current file and remove sgtk_publish_data
+        # if there is any.
+        textblocks = bpy.data.texts
+        current_data = textblocks.get('sgtk_publish_data')
+        if current_data:
+            textblocks.remove(current_data)
+
+        #open the blend file and retrieve the textblock.  If one already exsists remove it
+        with bpy.data.libraries.load(path, link=False) as (data_from, data_to):
+            #retrive the data from the file
+            data_to.texts = ['sgtk_publish_data']
+
+        #read the text block and store the data
+        text_obj = textblocks['sgtk_publish_data']
+        text_str = text_obj.as_string()
+
+        #remove the textblock once the data has been pulled
+        textblocks.remove(textblocks.get('sgtk_publish_data'))
+
+        #load the string from the textblock as json
+        sgtk_json = json.loads(text_str)
+        sgtk_link_list = sgtk_json['sgtk_link_collection']
+
+        # if this list is empty then it hasn't been published properly Because
+        # no blender publish file should be missing this data
+        if len(sgtk_link_list) == 0:
+            raise TankError("This blender file has not been published correctly")
+
+        #eliminate any duplicates in the list
+        sgtk_link_list = list(set(sgtk_link_list))
+
+        return sgtk_link_list
 
     def _create_link(self, path, sg_publish_data):
         """
@@ -308,11 +346,11 @@ class BlenderActions(HookBaseClass):
         :param sg_publish_data: Shotgun data dictionary with all the standard
                                 publish fields.
         """
-        if not os.path.exists(path):
-            raise TankError("File not found on disk - '%s'" % path)
+
+        sgtk_link_list = self._get_sgtk_collection_list(path)
 
         with bpy.data.libraries.load(path, link=True) as (data_from, data_to):
-            data_to.collections = data_from.collections
+            data_to.collections = sgtk_link_list
 
         for collection in data_to.collections:
             new_collection = bpy.data.objects.new(collection.name, None)
@@ -329,17 +367,14 @@ class BlenderActions(HookBaseClass):
         :param sg_publish_data: Shotgun data dictionary with all the standard
                                 publish fields.
         """
-        if not os.path.exists(path):
-            raise TankError("File not found on disk - '%s'" % path)
+
+        sgtk_link_list = self._get_sgtk_collection_list(path)
 
         with bpy.data.libraries.load(path, link=False) as (data_from, data_to):
-            data_to.collections = data_from.collections
+            data_to.collections = sgtk_link_list
 
         for collection in data_to.collections:
-            new_collection = bpy.data.objects.new(collection.name, None)
-            new_collection.instance_type = "COLLECTION"
-            new_collection.instance_collection = collection
-            bpy.context.scene.collection.objects.link(new_collection)
+            bpy.context.scene.collection.children.link(collection)
 
     def _do_import(self, path, sg_publish_data):
         """
