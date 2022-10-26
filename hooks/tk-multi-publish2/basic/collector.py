@@ -84,9 +84,53 @@ class BlenderSessionCollector(HookBaseClass):
         item = self.collect_current_blender_session(settings, parent_item)
 
         # Check to see if a primary alembic has been set
-        if bpy.context.scene.sgtk_abc_collection != None:
+        if bpy.context.scene.sgtk_abc_collection:
             self._collect_primary_abc_collection(item)
+        if bpy.context.scene.sgtk_aux_exports:
+            self._collect_multi_collection(item)
 
+    def _collect_multi_collection(self, parent_item):
+        """
+        Creates a an item based on the the sgtk_abc_collection in the
+        Shotgrid Publish Properties being filled.
+        """
+        profiles = { "ABC_Camera": {"publish_type":"Alembic Camera",
+                                    "ftype": "abc",
+                                    "ext": "abc",
+                                    "filter": "camera",
+                                    "item_type": "Camera",
+                                    "icon": "camera.png",
+                                    },
+                     "ABC_Geometry": {"publish_type":"Alembic Cache",
+                                                 "ftype": "abc",
+                                                 "ext": "abc",
+                                                 "filter": "geometry",
+                                                 "item_type": "Geometry",
+                                                 "icon": "geometry.png",
+                                                 },
+                    }
+        #get items from the blender ui widget
+        sgtk_aux_exports = bpy.context.scene.sgtk_aux_exports
+
+        for export in sgtk_aux_exports:
+            #select the correct profile profile
+            profile = profiles["%s_%s" % (export.type, export.profile)]
+
+            multi_item = parent_item.create_item(
+                "blender.%s.multi" % profile['filter'], profile["item_type"], export.collection.name
+            )
+
+            # get the icon path to display for this item
+            icon_path = os.path.join(self.disk_location, os.pardir, "icons", profile["icon"])
+
+            multi_item.set_icon_from_path(icon_path)
+
+            #set additional item properties
+            multi_item.properties['multi'] = True
+            multi_item.properties['collection'] = export.collection
+            multi_item.properties['publish_type'] = profile["publish_type"]
+            multi_item.properties['ftype'] = profile["ftype"]
+            multi_item.properties['ext'] = profile["ext"]
 
     def _collect_primary_abc_collection(self, parent_item):
         """
@@ -94,7 +138,7 @@ class BlenderSessionCollector(HookBaseClass):
         Shotgrid Publish Properties being filled.
         """
         geo_item = parent_item.create_item(
-            "blender.primary_abc_collection.geometry", "Geometry", "Collection Geometry"
+            "blender.pabc.geometry", "Geometry", "Primary Alembic"
         )
 
         # get the icon path to display for this item
@@ -103,8 +147,10 @@ class BlenderSessionCollector(HookBaseClass):
         geo_item.set_icon_from_path(icon_path)
 
         #set additional item properties
-        geo_item.properties['publish_type'] = "Alembic Cache"
+        geo_item.properties['multi'] = False
         geo_item.properties['collection'] = bpy.context.scene.sgtk_abc_collection
+        geo_item.properties['publish_type'] = "Alembic Cache"
+        geo_item.properties['ftype'] = "abc"
 
 
     def collect_current_blender_session(self, settings, parent_item):

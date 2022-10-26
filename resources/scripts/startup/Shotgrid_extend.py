@@ -43,17 +43,10 @@ class SGTKPROPERTIES_ListItem(PropertyGroup):
     """Group of properties representing an item in the list."""
     collectionTypes = [
                         ("ABC", "ABC", ""),
-                        ("USD", "USD", ""),
-                        ("Blend", "Blend", ""),
-                        ("FBX", "FBX", ""),
-                        ("OBJ", "OBJ", ""),
                         ]
     collectionProfiles = [
-                        ("Misc", "Misc", ""),
-                        ("Anim", "Anim", ""),
+                        ("Geometry", "Geometry", ""),
                         ("Camera", "Camera", ""),
-                        ("Mesh", "Mesh", ""),
-                        ("Layout", "Layout", ""),
                         ]
 
     collection: PointerProperty(
@@ -72,7 +65,7 @@ class SGTKPROPERTIES_ListItem(PropertyGroup):
            name="Profile",
            items=collectionProfiles,
            description="Profile to use for Export",
-           default="Misc")
+           default="Geometry")
 
 class SGTKPROPERTIES_UL_List(UIList):
 
@@ -81,17 +74,10 @@ class SGTKPROPERTIES_UL_List(UIList):
 
         type_icon = {
                     'ABC' : 'COLLECTION_COLOR_01',
-                    'USD' : 'COLLECTION_COLOR_02',
-                    'Blend' : 'COLLECTION_COLOR_03',
-                    'FBX' : 'COLLECTION_COLOR_04',
-                    'OBJ' : 'COLLECTION_COLOR_05',
         }
         profile_icon = {
-                    'Misc' : 'UGLYPACKAGE',
-                    'Anim' : 'ANIM',
+                    'Geometry' : 'MESH_DATA',
                     'Camera' : 'CAMERA_DATA',
-                    'Mesh' : 'MESH_DATA',
-                    'Layout' : 'WORLD_DATA',
         }
 
         collection_item = item.collection
@@ -249,7 +235,7 @@ def sg_render_path(kwargs):
     #check to make it's set to an entity
     if sgengine.context.entity is None:
         return
-    
+
     context = sgengine.context.entity.get('type')
     tk = sgengine.tank
 

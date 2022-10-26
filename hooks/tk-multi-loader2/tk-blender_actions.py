@@ -16,7 +16,7 @@ Hook that loads defines all the available actions, broken down by publish type.
 """
 
 import os
-from contextlib import contextmanager
+import contextlib
 
 import bpy
 import sgtk
@@ -29,6 +29,8 @@ __contact__ = "https://www.linkedin.com/in/diegogh/"
 
 
 HookBaseClass = sgtk.get_hook_baseclass()
+PUBLISH_DATA_KEY_NAME = "sgtk_publish_data"
+LINK_LIST_KEY_NAME = "sgtk_link_collection"
 
 
 def get_view3d_operator_context():
@@ -299,43 +301,43 @@ class BlenderActions(HookBaseClass):
     ###########################################################################
     # helper methods which can be subclassed in custom hooks to fine tune the
     # behaviour of things
+
+    @contextlib.contextmanager
+    def __no_leftover_data(self):
+        def remove_data():
+            data = bpy.data.texts.get(PUBLISH_DATA_KEY_NAME)
+            if data:
+                bpy.data.texts.remove(data)
+        try:
+            # Ensure no leftover data from previous operations are present.
+            remove_data()
+            yield
+
+        finally:
+            # Ensure no data is left over from the current operation.
+            remove_data()
+
     def _get_sgtk_collection_list(self, path):
 
         if not os.path.exists(path):
-            raise TankError("File not found on disk - '%s'" % path)
+            raise TankError("Path '{0}' does not exist.".format(path))
 
-        # get the text blocks from the current file and remove sgtk_publish_data
-        # if there is any.
-        textblocks = bpy.data.texts
-        current_data = textblocks.get('sgtk_publish_data')
-        if current_data:
-            textblocks.remove(current_data)
+        with self.__no_leftover_data():
+            with bpy.data.libraries.load(path, link=False) as (_, data_to):
+                data_to.texts = [PUBLISH_DATA_KEY_NAME]
 
-        #open the blend file and retrieve the textblock.  If one already exsists remove it
-        with bpy.data.libraries.load(path, link=False) as (data_from, data_to):
-            #retrive the data from the file
-            data_to.texts = ['sgtk_publish_data']
+            try:
+                data_str = bpy.data.texts[PUBLISH_DATA_KEY_NAME].as_string()
 
-        #read the text block and store the data
-        text_obj = textblocks['sgtk_publish_data']
-        text_str = text_obj.as_string()
+            except KeyError:
+                raise TankError("No '{0}' text data found in '{1}'.".format(PUBLISH_DATA_KEY_NAME, path))
 
-        #remove the textblock once the data has been pulled
-        textblocks.remove(textblocks.get('sgtk_publish_data'))
+            else:
+                sgtk_link_collection = json.loads(data_str).get(LINK_LIST_KEY_NAME)
+                if not sgtk_link_collection:
+                    raise TankError("'{0}' in '{1}' is empty or not present.".format(LINK_LIST_KEY_NAME, path))
 
-        #load the string from the textblock as json
-        sgtk_json = json.loads(text_str)
-        sgtk_link_list = sgtk_json['sgtk_link_collection']
-
-        # if this list is empty then it hasn't been published properly Because
-        # no blender publish file should be missing this data
-        if len(sgtk_link_list) == 0:
-            raise TankError("This blender file has not been published correctly")
-
-        #eliminate any duplicates in the list
-        sgtk_link_list = list(set(sgtk_link_list))
-
-        return sgtk_link_list
+                return list(set(sgtk_link_collection))
 
     def _create_link(self, path, sg_publish_data):
         """
@@ -395,7 +397,7 @@ class BlenderActions(HookBaseClass):
         context = get_view3d_operator_context()
 
         if extension_name in ("abc",):
-            bpy.ops.wm.alembic_import(context, filepath=path, as_background_job=False)
+            bpy.ops.wm.alembic_import(context, filepath=path, as_background_job=False, set_frame_range=False)
 
         elif extension_name in ("dae",):
             bpy.ops.wm.collada_import(context, filepath=path, as_background_job=False)
