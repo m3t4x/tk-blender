@@ -102,6 +102,13 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
                 "description": "Template path for published work files. Should"
                 "correspond to a template defined in "
                 "templates.yml.",
+            },
+            "Publish Multi Template": {
+                "type": "template",
+                "default": None,
+                "description": "Template path for published work files. Should"
+                "correspond to a template defined in "
+                "templates.yml.",
             }
         }
 
@@ -119,7 +126,7 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
         accept() method. Strings can contain glob patters such as *, for example
         ["blender.*", "file.blender"]
         """
-        return ["blender.primary_abc_collection.geometry"]
+        return ["blender.pabc.geometry", "blender.*.multi"]
 
     def accept(self, settings, item):
         """
@@ -149,7 +156,10 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
 
         accepted = True
         publisher = self.parent
-        template_name = settings["Publish Template"].value
+        if item.properties.multi:
+            template_name = settings["Publish Multi Template"].value
+        else:
+            template_name = settings["Publish Template"].value
 
         # ensure a work file template is available on the parent item
         work_template = item.parent.properties.get("work_template")
@@ -232,6 +242,12 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
         # template:
         work_fields = work_template.get_fields(path)
 
+        #add fields for multi cache publish
+        if item.properties.multi:
+            work_fields["abcset_name"] = item.name
+            work_fields["ext"] = item.properties['ext']
+            work_fields["ftype"] = item.properties['ftype']
+
         # ensure the fields work for the publish template
         missing_keys = publish_template.missing_keys(work_fields)
         if missing_keys:
@@ -269,11 +285,11 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
         selects the contents of the collection for export
         """
 
+        #Deselect Everything
+        self.clear_selection()
+
         #get the viewlayer object of the collection
         vl_collection = bpy.context.view_layer.layer_collection.children[collection.name]
-
-        #Deselect Everything
-        bpy.ops.object.select_all(action='DESELECT')
 
         #if the collection is currently exluded then unexclude it
         if vl_collection.exclude == True:
@@ -290,14 +306,18 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
 
         return
 
+    def clear_selection(self):
+        #Deselect Everything in the scene
+        objects = bpy.context.scene.objects
+        for obj in objects:
+            obj.select_set(False)
+        return
+
     def abc_publish(self, collection, publish_path, start_frame, end_frame):
         """
-        runs the publish for all alembic output
+        runs the publish for all alembic output.
         """
         try:
-            #select the contents of the collection to run on
-            self.select_collection(collection)
-
             context = get_view3d_operator_context()
 
             bpy.ops.wm.alembic_export(
@@ -311,9 +331,6 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
                 start=start_frame,
                 end=end_frame,
             )
-
-            #Deselect Everything
-            bpy.ops.object.select_all(action='DESELECT')
 
         except Exception as e:
             error_msg = "Failed to export Geometry: %s" % e
@@ -333,9 +350,6 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
         # get the path to create and publish
         publish_path = item.properties["path"]
 
-        #get the publish type
-        publish_type = item.properties["publish_type"]
-
         #get the publish collection
         publish_collection = item.properties["collection"]
 
@@ -345,9 +359,11 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
 
         start_frame, end_frame = _find_scene_animation_range()
 
-        if publish_type == "Alembic Cache":
-            self.abc_publish(publish_collection, publish_path, start_frame, end_frame)
+        #select the contents of the collection to run on
+        self.select_collection(publish_collection)
 
+        if item.properties['ftype'] == "abc":
+            self.abc_publish(publish_collection, publish_path, start_frame, end_frame)
 
         # Now that the path has been generated, hand it off to the
         super(BlenderSessionGeometryPublishPlugin, self).publish(settings, item)
