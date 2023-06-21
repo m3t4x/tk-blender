@@ -15,7 +15,7 @@
 A Blender engine for Tank.
 https://www.blender.org/
 """
-
+import collections
 import os
 import sys
 import time
@@ -332,6 +332,8 @@ class BlenderEngine(Engine):
         utf8 = QtCore.QTextCodec.codecForName("utf-8")
         QtCore.QTextCodec.setCodecForCStrings(utf8)
         self.logger.debug("set utf-8 codec for widget text")
+        from collections.abc import MutableMapping
+        collections.MutableMapping = MutableMapping
 
     def check_version_compatibility(self):
         """
