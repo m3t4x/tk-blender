@@ -114,7 +114,7 @@ class QtWindowEventLoop(bpy.types.Operator):
         return {"PASS_THROUGH"}
 
     def anyQtWindowsAreOpen(self):
-        return any(w.isVisible() for w in QtWidgets.QApplication.topLevelWidgets())
+        return True
 
     def execute(self, context):
         # create a QApplication if already does not exists
