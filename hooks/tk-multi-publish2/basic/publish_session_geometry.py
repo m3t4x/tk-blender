@@ -318,6 +318,7 @@ class BlenderSessionGeometryPublishPlugin(HookBaseClass):
         runs the publish for all alembic output.
         """
         try:
+            context = get_view3d_operator_context()
             app_version = bpy.app.version  # The Blender version as a tuple of 3 numbers. eg. (2, 83, 1)
             major_version = app_version[0]
 
