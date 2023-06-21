@@ -236,15 +236,15 @@ class BlenderEngine(Engine):
         Displays a dialog with the message according to  the severity level
         specified.
         """
-        from sgtk.platform.qt import QtGui, QtCore
+        from PySide2 import QtWidgets, QtCore
 
         level_icon = {
-            "info": QtGui.QMessageBox.Information,
-            "error": QtGui.QMessageBox.Critical,
-            "warning": QtGui.QMessageBox.Warning,
+            "info": QtWidgets.QMessageBox.Information,
+            "error": QtWidgets.QMessageBox.Critical,
+            "warning": QtWidgets.QMessageBox.Warning,
         }
 
-        dlg = QtGui.QMessageBox()
+        dlg = QtWidgets.QMessageBox()
         dlg.setIcon(level_icon[level])
         dlg.setText(msg)
         dlg.setWindowTitle(ENGINE_NICE_NAME)
